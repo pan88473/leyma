@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sam & Leyma - Love Story</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0b0914;
+            font-family: 'Courier New', Courier, monospace;
+            color: #ffffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            max-width: 450px;
+            height: 100%;
+            background: #131026;
+            overflow: hidden;
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+        }
+
+        .screen {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: none;
+            flex-direction: column;
+            z-index: 10;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        #screen-menu {
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            background: linear-gradient(180deg, #18122B 0%, #03001C 100%);
+        }
+
+        .menu-title {
+            font-size: 2.2rem;
+            text-align: center;
+            color: #ff758f;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px rgba(255,117,143,0.5);
+        }
+
+        .menu-subtitle {
+            font-size: 0.9rem;
+            color: #b1b2ff;
+            margin-bottom: 60px;
+            text-align: center;
+        }
+
+        .btn {
+            width: 80%;
+            max-width: 280px;
+            background: rgba(255, 117, 143, 0.2);
+            color: #ffffff;
+            border: 2px solid #ff758f;
+            padding: 15px;
+            font-size: 1.1rem;
+            font-family: inherit;
+            margin: 10px 0;
+            border-radius: 8px;
+            cursor: pointer;
+            letter-spacing: 2px;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .btn:active {
+            background: #ff758f;
+            color: #000;
+            transform: scale(0.95);
+        }
+
+        #screen-game {
+            position: relative;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            background: #231942;
+            display: block;
+        }
+
+        #story-box {
+            position: absolute;
+            bottom: 110px;
+            left: 5%;
+            width: 90%;
+            background: rgba(19, 16, 38, 0.95);
+            border: 2px solid #ff758f;
+            border-radius: 10px;
+            padding: 15px;
+            z-index: 30;
+            display: none;
+            box-shadow: 0 0 20px rgba(0,0,0,0.6);
+        }
+
+        #story-box h3 {
+            color: #ff758f;
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+        }
+
+        #story-box p {
+            font-size: 0.9rem;
+            line-height: 1.3;
+            color: #e2e8f0;
+            margin-bottom: 10px;
+        }
+
+        .touch-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 20px;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .d-pad, .action-pad {
+            display: flex;
+            gap: 15px;
+            pointer-events: auto;
+        }
+
+        .ctrl-btn {
+            width: 65px;
+            height: 65px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(4px);
+        }
+
+        .ctrl-btn:active {
+            background: rgba(255, 117, 143, 0.6);
+            border-color: #ff758f;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <!-- MENÚ PRINCIPAL -->
+        <div id="screen-menu" class="screen active">
+            <h1 class="menu-title">SAM & LEYMA</h1>
+            <p class="menu-subtitle">Mundos más grandes, misma promesa</p>
+            <button class="btn" onclick="iniciarJuego()">JUGAR</button>
+        </div>
+
+        <!-- JUEGO ACTIVO -->
+        <div id="screen-game" class="screen">
+            <canvas id="gameCanvas"></canvas>
+
+            <div id="story-box">
+                <h3 id="story-title">Capítulo</h3>
+                <p id="story-text">...</p>
+                <button class="btn" style="width:100%; padding:8px; font-size:0.9rem; margin:0;" onclick="avanzarNivel()">SIGUIENTE PASO</button>
+            </div>
+
+            <div class="touch-controls" id="game-controls">
+                <div class="d-pad">
+                    <div class="ctrl-btn" id="btn-left">◀</div>
+                    <div class="ctrl-btn" id="btn-right">▶</div>
+                </div>
+                <div class="action-pad">
+                    <div class="ctrl-btn" id="btn-jump">▲</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="bgMusic" loop>
+        <source src="músicacap1.mp3" type="audio/mpeg">
+    </audio>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const bgMusic = document.getElementById('bgMusic');
+
+        // Sprites e Imágenes cargadas dinámicamente
+        const spriteEstatico = new Image(); spriteEstatico.src = 'estatico_4.png';
+        const spriteCaminar = new Image();  spriteCaminar.src = 'caminar_3.png';
+        const spriteSalto = new Image();    spriteSalto.src = 'salto_4.png';
+        const spriteLeyma = new Image();    spriteLeyma.src = 'leyma1.png';
+
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+
+        function cambiarPantalla(pantallaId) {
+            document.querySelectorAll('.screen').forEach(p => p.classList.remove('active'));
+            document.getElementById(pantallaId).classList.add('active');
+        }
+
+        let gameLoopId;
+        let nivelActual = 1;
+        let historiaActiva = false;
+        let portalAnimFrame = 0;
+        const keys = { left: false, right: false, jump: false };
+
+        const world = { width: 800, height: 1200 };
+        const camera = { x: 0, y: 0 };
+
+        const player = {
+            x: 80, y: 1000,
+            width: 45, height: 65,      
+            speed: 5, velX: 0, velY: 0,
+            jumping: false, grounded: false,
+            state: 'idle', direction: 'right',
+            frameIndex: 0, tickCount: 0, ticksPerFrame: 8 
+        };
+
+        // Dimensiones físicas de Leyma ajustadas proporcionalmente a su sprite sentada
+        const leyma = { x: 0, y: 0, width: 42, height: 62 };
+        const gravity = 0.55;
+        const friction = 0.82;
+        let platforms = [];
+        let enemies = [];
+
+        const textosCapitulos = {
+            1: { titulo: "Capítulo 1: Subiendo a las alturas", texto: "El camino ya no es plano, Leyma. He tenido que escalar viejas ruinas flotantes solo para ver tu silueta a lo lejos." },
+            2: { titulo: "Capítulo 2: El Abismo de los Espectros", texto: "Fantasmas por la izquierda, acantilados por la derecha... Pero mi corazón viaja más rápido que mis pies hacia ti." },
+            3: { titulo: "Capítulo 3: Un Mar de Plataformas", texto: "Cada salto cuenta, la altura marea, pero saber que estás arriba esperándome hace que todo el esfuerzo valga la pena." },
+            4: { titulo: "Capítulo 4: El Laberinto de Nubes", texto: "Por fin... más allá de las nubes oscuras puedo tocar tu mano. Pero la realidad se deforma a nuestro alrededor." },
+            5: { titulo: "Capítulo 5: La Fractura del Tiempo", texto: "¡Cuidado, Sam! El portal se vuelve inestable. Los saltos exigen total precisión y las sombras atacan sin descanso." },
+            6: { titulo: "Capítulo 6: El Reencuentro Eterno", texto: "Cruzamos el último umbral del vacío. Juntos superamos la distancia y el peligro. Ya nada podrá separarnos." }
+        };
+
+        // DISTANCIAS PERFECTAS DE SALTO Y NIVELES 5 Y 6 DE ALTA DIFICULTAD
+        function generarNivel(nivel) {
+            historiaActiva = false;
+            document.getElementById('story-box').style.display = 'none';
+            document.getElementById('game-controls').style.opacity = '1';
+            document.getElementById('game-controls').style.pointerEvents = 'auto';
+
+            player.x = 80;
+            player.y = world.height - 160;
+            player.velX = 0; player.velY = 0;
+
+            if (nivel === 1) {
+                platforms = [
+                    { x: 0, y: world.height - 70, width: 350, height: 80 }, 
+                    { x: 420, y: world.height - 160, width: 220, height: 40 }, 
+                    { x: 260, y: world.height - 260, width: 200, height: 40 }, 
+                    { x: 70, y: world.height - 350, width: 180, height: 40 },  
+                    { x: 220, y: world.height - 460, width: 250, height: 40 }, 
+                    { x: 500, y: world.height - 540, width: 200, height: 40 },
+                    { x: 350, y: world.height - 640, width: 180, height: 40 },
+                    { x: 120, y: world.height - 740, width: 220, height: 45 }
+                ];
+                leyma.x = 160; leyma.y = world.height - 802;
+                enemies = [{ x: 250, y: world.height - 492, width: 32, height: 32, startX: 230, endX: 410, speed: 1.8, dir: 1, type: '👻' }];
+            }
+            else if (nivel === 2) {
+                platforms = [
+                    { x: 0, y: world.height - 70, width: 220, height: 80 },
+                    { x: 340, y: world.height - 70, width: 300, height: 80 }, 
+                    { x: 500, y: world.height - 180, width: 200, height: 40 },
+                    { x: 330, y: world.height - 280, width: 180, height: 40 },
+                    { x: 150, y: world.height - 380, width: 180, height: 40 },
+                    { x: 280, y: world.height - 490, width: 220, height: 40 },
+                    { x: 460, y: world.height - 590, width: 200, height: 40 },
+                    { x: 250, y: world.height - 690, width: 220, height: 45 }
+                ];
+                leyma.x = 290; leyma.y = world.height - 752;
+                enemies = [
+                    { x: 380, y: world.height - 102, width: 32, height: 32, startX: 350, endX: 580, speed: 2, dir: 1, type: '👻' },
+                    { x: 300, y: world.height - 522, width: 32, height: 32, startX: 290, endX: 460, speed: 2.2, dir: -1, type: '🦇' }
+                ];
+            }
+            else if (nivel === 3) {
+                platforms = [
+                    { x: 0, y: world.height - 70, width: 250, height: 80 },
+                    { x: 320, y: world.height - 160, width: 160, height: 40 },
+                    { x: 550, y: world.height - 250, width: 180, height: 40 },
+                    { x: 380, y: world.height - 350, width: 180, height: 40 },
+                    { x: 180, y: world.height - 440, width: 200, height: 40 },
+                    { x: 340, y: world.height - 540, width: 220, height: 40 },
+                    { x: 560, y: world.height - 630, width: 160, height: 40 },
+                    { x: 380, y: world.height - 730, width: 180, height: 40 },
+                    { x: 180, y: world.height - 820, width: 200, height: 40 },
+                    { x: 300, y: world.height - 920, width: 250, height: 45 }
+                ];
+                leyma.x = 350; leyma.y = world.height - 982;
+                enemies = [
+                    { x: 200, y: world.height - 472, width: 32, height: 32, startX: 190, endX: 340, speed: 2.3, dir: 1, type: '💀' },
+                    { x: 400, y: world.height - 762, width: 32, height: 32, startX: 390, endX: 530, speed: 2.5, dir: -1, type: '🔥' }
+                ];
+            }
+            else if (nivel === 4) {
+                platforms = [
+                    { x: 0, y: world.height - 70, width: 200, height: 80 },
+                    { x: 260, y: world.height - 150, width: 150, height: 40 },
+                    { x: 480, y: world.height - 240, width: 160, height: 40 },
+                    { x: 320, y: world.height - 340, width: 180, height: 40 },
+                    { x: 140, y: world.height - 430, width: 150, height: 40 },
+                    { x: 260, y: world.height - 530, width: 260, height: 40 }, 
+                    { x: 580, y: world.height - 620, width: 150, height: 40 },
+                    { x: 400, y: world.height - 710, width: 160, height: 40 },
+                    { x: 180, y: world.height - 800, width: 180, height: 40 },
+                    { x: 320, y: world.height - 900, width: 160, height: 40 },
+                    { x: 520, y: world.height - 990, width: 180, height: 40 },
+                    { x: 250, y: world.height - 1080, width: 300, height: 50 } 
+                ];
+                leyma.x = 350; leyma.y = world.height - 1142;
+                enemies = [
+                    { x: 280, y: world.height - 562, width: 32, height: 32, startX: 270, endX: 490, speed: 3, dir: 1, type: '😈' },
+                    { x: 200, y: world.height - 832, width: 32, height: 32, startX: 190, endX: 330, speed: 2.6, dir: 1, type: '🦇' }
+                ];
+            }
+            // NUEVO CAPÍTULO 5: RESTRICCIONES DE MOVIMIENTO EXTERNAS (ZIGZAG VERTICAL ESTRECHO)
+            else if (nivel === 5) {
+                platforms = [
+                    { x: 0, y: world.height - 70, width: 180, height: 80 },
+                    { x: 240, y: world.height - 150, width: 140, height: 40 },
+                    { x: 440, y: world.height - 240, width: 140, height: 40 },
+                    { x: 630, y: world.height - 330, width: 130, height: 40 },
+                    { x: 480, y: world.height - 420, width: 120, height: 40 },
+                    { x: 280, y: world.height - 510, width: 140, height: 40 },
+                    { x: 90, y: world.height - 600, width: 140, height: 40 },
+                    { x: 220, y: world.height - 700, width: 130, height: 40 },
+                    { x: 420, y: world.height - 790, width: 140, height: 40 },
+                    { x: 600, y: world.height - 880, width: 150, height: 40 },
+                    { x: 380, y: world.height - 970, width: 160, height: 50 }
+                ];
+                leyma.x = 440; leyma.y = world.height - 1032;
+                enemies = [
+                    { x: 450, y: world.height - 272, width: 32, height: 32, startX: 445, endX: 555, speed: 3.2, dir: 1, type: '💀' },
+                    { x: 100, y: world.height - 632, width: 32, height: 32, startX: 95, endX: 210, speed: 3.5, dir: -1, type: '🔥' }
+                ];
+            }
+            // NUEVO CAPÍTULO 6: INFRAESTRUCTURA DE VACÍO SUPREMO (MÁXIMA EXIGENCIA)
+            else {
+                platforms = [
+                    { x: 0, y: world.height - 70, width: 150, height: 80 },
+                    { x: 200, y: world.height - 160, width: 110, height: 40 },
+                    { x: 400, y: world.height - 250, width: 110, height: 40 },
+                    { x: 600, y: world.height - 340, width: 120, height: 40 },
+                    { x: 420, y: world.height - 440, width: 130, height: 40 },
+                    { x: 220, y: world.height - 530, width: 110, height: 40 },
+                    { x: 50, y: world.height - 620, width: 120, height: 40 },
+                    { x: 200, y: world.height - 710, width: 130, height: 40 },
+                    { x: 400, y: world.height - 800, width: 110, height: 40 },
+                    { x: 580, y: world.height - 890, width: 130, height: 40 },
+                    { x: 360, y: world.height - 980, width: 110, height: 40 },
+                    { x: 150, y: world.height - 1070, width: 320, height: 60 }
+                ];
+                leyma.x = 280; leyma.y = world.height - 1132;
+                enemies = [
+                    { x: 210, y: world.height - 192, width: 32, height: 32, startX: 205, endX: 295, speed: 3.8, dir: 1, type: '👻' },
+                    { x: 430, y: world.height - 472, width: 32, height: 32, startX: 425, endX: 535, speed: 4.0, dir: -1, type: '👹' },
+                    { x: 410, y: world.height - 832, width: 32, height: 32, startX: 405, endX: 495, speed: 3.5, dir: 1, type: '👾' }
+                ];
+            }
+        }
+
+        function dibujarPlataformaEstilizada(plat) {
+            ctx.fillStyle = '#3a2d66';
+            ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+
+            ctx.fillStyle = '#ff9ebb';
+            ctx.fillRect(plat.x, plat.y, plat.width, 6);
+
+            ctx.fillStyle = '#1c1433';
+            ctx.fillRect(plat.x, plat.y + plat.height - 4, plat.width, 4);
+
+            ctx.fillStyle = '#4e3f85';
+            for (let xOffset = 20; xOffset < plat.width; xOffset += 40) {
+                ctx.fillRect(plat.x + xOffset, plat.y + 6, 3, plat.height - 10);
+            }
+        }
+
+        // DIBUJAR PORTAL MÁGICO AL LADO DE LEYMA
+        function dibujarPortal(x, y) {
+            portalAnimFrame += 0.05;
+            let radioBase = 45 + Math.sin(portalAnimFrame) * 5;
+
+            let gradient = ctx.createRadialGradient(x, y, 5, x, y, radioBase);
+            gradient.addColorStop(0, 'rgba(177, 178, 255, 0.9)');
+            gradient.addColorStop(0.5, 'rgba(255, 117, 143, 0.5)');
+            gradient.addColorStop(1, 'rgba(35, 25, 66, 0)');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(x, y, radioBase, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Partículas internas del portal
+            ctx.fillStyle = '#ffffff';
+            for (let i = 0; i < 4; i++) {
+                let px = x + Math.cos(portalAnimFrame + i * Math.PI / 2) * (radioBase * 0.4);
+                let py = y + Math.sin(portalAnimFrame + i * Math.PI / 2) * (radioBase * 0.4);
+                ctx.fillRect(px, py, 3, 3);
+            }
+        }
+
+        function configurarControles() {
+            const setupTouchBtn = (id, keyProp) => {
+                const btn = document.getElementById(id);
+                btn.addEventListener('touchstart', (e) => { e.preventDefault(); if(!historiaActiva) keys[keyProp] = true; });
+                btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[keyProp] = false; });
+            };
+
+            setupTouchBtn('btn-left', 'left');
+            setupTouchBtn('btn-right', 'right');
+            setupTouchBtn('btn-jump', 'jump');
+
+            window.addEventListener('keydown', (e) => {
+                if (historiaActiva) return;
+                if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = true;
+                if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = true;
+                if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') keys.jump = true;
+            });
+
+            window.addEventListener('keyup', (e) => {
+                if (e.code === 'ArrowLeft' || e.code === 'KeyA') keys.left = false;
+                if (e.code === 'ArrowRight' || e.code === 'KeyD') keys.right = false;
+                if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') keys.jump = false;
+            });
+        }
+
+        function actualizarEstadoYAnimacion() {
+            if (keys.left) player.direction = 'left';
+            if (keys.right) player.direction = 'right';
+
+            if (!player.grounded) {
+                player.state = 'jump';
+            } else if (keys.left || keys.right) {
+                player.state = 'walk';
+            } else {
+                player.state = 'idle';
+            }
+
+            player.tickCount++;
+            if (player.state === 'idle') {
+                player.frameIndex = 0; 
+            } else if (player.state === 'walk') {
+                if (player.tickCount > 6) {
+                    player.tickCount = 0;
+                    player.frameIndex = (player.frameIndex + 1) % 7; 
+                }
+            } else if (player.state === 'jump') {
+                player.frameIndex = player.velY < 0 ? 1 : 4;
+            }
+        }
+
+        function verificarObjetivo() {
+            // El punto de contacto es Leyma o el Portal
+            if (player.x < leyma.x + leyma.width + 30 &&
+                player.x + player.width > leyma.x - 30 &&
+                player.y < leyma.y + leyma.height &&
+                player.y + player.height > leyma.y) {
+                
+                historiaActiva = true;
+                keys.left = false; keys.right = false; keys.jump = false;
+                player.velX = 0;
+
+                const dataNarrativa = textosCapitulos[nivelActual] || textosCapitulos[1];
+                document.getElementById('story-title').innerText = dataNarrativa.titulo;
+                document.getElementById('story-text').innerText = dataNarrativa.texto;
+                
+                document.getElementById('story-box').style.display = 'block';
+                document.getElementById('game-controls').style.pointerEvents = 'none';
+                document.getElementById('game-controls').style.opacity = '0.3';
+            }
+        }
+
+        function avanzarNivel() {
+            nivelActual++;
+            if (textosCapitulos[nivelActual]) {
+                generarNivel(nivelActual);
+            } else {
+                document.getElementById('story-box').style.display = 'none';
+                cambiarPantalla('screen-menu');
+                bgMusic.pause(); 
+                cancelAnimationFrame(gameLoopId);
+                gameLoopId = null;
+            }
+        }
+
+        function update() {
+            if (!historiaActiva) {
+                if (keys.left) if (player.velX > -player.speed) player.velX--;
+                if (keys.right) if (player.velX < player.speed) player.velX++;
+            }
+
+            player.velX *= friction;
+            player.velY += gravity;
+
+            if (keys.jump && !player.jumping && player.grounded && !historiaActiva) {
+                player.jumping = true;
+                player.grounded = false;
+                player.velY = -12; 
+            }
+
+            player.grounded = false;
+            player.x += player.velX;
+            player.y += player.velY;
+
+            if (player.y > world.height) {
+                generarNivel(nivelActual);
+            }
+
+            for (let i = 0; i < platforms.length; i++) {
+                let plat = platforms[i];
+                if (player.x < plat.x + plat.width &&
+                    player.x + player.width > plat.x &&
+                    player.y + player.height <= plat.y + 12 &&
+                    player.y + player.height + player.velY >= plat.y) {
+                    
+                    player.grounded = true;
+                    player.jumping = false;
+                    player.velY = 0;
+                    player.y = plat.y - player.height;
+                }
+            }
+
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > world.width) player.x = world.width - player.width;
+
+            if (!historiaActiva) {
+                enemies.forEach(enemy => {
+                    enemy.x += enemy.speed * enemy.dir;
+                    if (enemy.x <= enemy.startX) enemy.dir = 1;
+                    if (enemy.x >= enemy.endX) enemy.dir = -1;
+
+                    const p = 5; 
+                    if (player.x + p < enemy.x + enemy.width &&
+                        player.x + player.width - p > enemy.x &&
+                        player.y + p < enemy.y + enemy.height &&
+                        player.y + player.height - p > enemy.y) {
+                        generarNivel(nivelActual);
+                    }
+                });
+            }
+
+            if (!historiaActiva) verificarObjetivo();
+            actualizarEstadoYAnimacion();
+
+            camera.x = player.x - canvas.width / 2;
+            camera.y = player.y - canvas.height / 2;
+
+            if (camera.x < 0) camera.x = 0;
+            if (camera.y < 0) camera.y = 0;
+            if (camera.x > world.width - canvas.width) camera.x = world.width - canvas.width;
+            if (camera.y > world.height - canvas.height) camera.y = world.height - canvas.height;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            ctx.fillStyle = '#231942';
+            ctx.fillRect(0, 0, world.width, world.height);
+
+            platforms.forEach(plat => {
+                dibujarPlataformaEstilizada(plat);
+            });
+
+            // RENDERIZAR PORTAL AL LADO DE LEYMA
+            dibujarPortal(leyma.x + leyma.width + 25, leyma.y + leyma.height / 2);
+
+            // RENDERIZAR A LEYMA USANDO SU SPRITE OFICIAL
+            if (spriteLeyma.complete && spriteLeyma.naturalWidth > 0) {
+                ctx.drawImage(spriteLeyma, leyma.x, leyma.y, leyma.width, leyma.height);
+            } else {
+                ctx.fillStyle = '#b1b2ff';
+                ctx.fillRect(leyma.x, leyma.y, leyma.width, leyma.height);
+            }
+
+            ctx.font = "28px Arial";
+            ctx.textAlign = "left";
+            ctx.textBaseline = "top";
+            enemies.forEach(enemy => {
+                ctx.fillText(enemy.type, enemy.x, enemy.y - 4);
+            });
+
+            let imgActiva = player.state === 'idle' ? spriteEstatico : (player.state === 'walk' ? spriteCaminar : spriteSalto);
+            let columnasFisicas = player.state === 'idle' ? 3 : 7;
+
+            if (imgActiva.complete && imgActiva.naturalWidth > 0) {
+                const frameWidth = imgActiva.width / columnasFisicas;
+                const frameHeight = imgActiva.height;
+
+                ctx.save();
+                if (player.direction === 'left') {
+                    ctx.translate(player.x + player.width, player.y);
+                    ctx.scale(-1, 1);
+                    ctx.drawImage(imgActiva, player.frameIndex * frameWidth, 0, frameWidth, frameHeight, 0, 0, player.width, player.height);
+                } else {
+                    ctx.drawImage(imgActiva, player.frameIndex * frameWidth, 0, frameWidth, frameHeight, player.x, player.y, player.width, player.height);
+                }
+                ctx.restore();
+            } else {
+                ctx.fillStyle = '#ff758f';
+                ctx.fillRect(player.x, player.y, player.width, player.height);
+            }
+
+            ctx.restore();
+
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "14px Courier New";
+            ctx.fillText(`CAPÍTULO ${nivelActual}/6`, 15, 30);
+
+            gameLoopId = requestAnimationFrame(update);
+        }
+
+        function iniciarJuego() {
+            cambiarPantalla('screen-game');
+            resizeCanvas();
+            nivelActual = 1;
+            generarNivel(nivelActual);
+            
+            bgMusic.play().catch(error => {
+                console.log("Audio play deferred.");
+            });
+
+            if (!gameLoopId) {
+                configurarControles();
+                update();
+            }
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+    </script>
+</body>
+</html>
